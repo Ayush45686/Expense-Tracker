@@ -317,3 +317,10 @@ button.add:hover{opacity:1;filter:brightness(1.04);transform:translateY(-1px);bo
   margin-left: auto;
   margin-right: auto;
 }
+
+/* Fixed website theme: keep the existing dark appearance regardless of OS theme. */
+:root{
+  color-scheme: dark;
+  --paper:#111827; --card:#1b2535; --paper-alt:#202c3e; --ink:#f1f5f9;
+  --ink-soft:#a0aec0; --line:#344256; --accent:#91a6ff; --accent-soft:#293653; --spend:#ff8c96;
+}
