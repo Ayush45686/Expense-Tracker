@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Expense Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <button type="button" class="hamburger-btn" id="hamburgerBtn" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mobileDrawer">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="brand">
+      <div class="brand-text">
+        <h1>Expense Tracker</h1>
+       
+      </div>
+    </div>
+    <nav class="tabs-nav">
+      <button type="button" class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span><span class="tab-label">Home</span></button>
+      <button type="button" class="tab-btn" data-tab="viz"><span class="tab-icon">📊</span><span class="tab-label">Visualization</span></button>
+    </nav>
+    <div class="corner">
+      <div class="guest-btns" id="guestBtns">
+        <button type="button" class="corner-btn" id="openLogin">Log in</button>
+        <button type="button" class="corner-btn primary" id="openSignup">Sign up</button>
+      </div>
+      <div class="user-bar" id="userBar" hidden>
+        <span id="userGreeting"></span>
+        <button type="button" class="corner-btn" id="logoutBtn">Log out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<div class="mobile-drawer" id="mobileDrawer">
+  <button type="button" class="drawer-item active" data-tab="home"><span class="tab-icon">🏠</span> Home</button>
+  <button type="button" class="drawer-item" data-tab="viz"><span class="tab-icon">📊</span> Visualization</button>
+  <hr class="drawer-hr">
+  <p class="drawer-trust"><span id="trustCount">—</span> people trust our site</p>
+</div>
+
+<div class="wrap">
+  <div class="guest-notice" id="guestNotice">You're in guest mode. Your records will be wiped when you refresh. <a href="#" id="noticeSignup">Sign up</a> or <a href="#" id="noticeLogin">log in</a> to save them.</div>
+
+  <div id="homeView">
+  <div id="appScreen">
+
+  <div class="month-nav">
+    <button class="arrow-btn" id="prevMonth" aria-label="Previous month">‹</button>
+    <div class="month-label" id="monthLabel"></div>
+    <button class="arrow-btn" id="nextMonth" aria-label="Next month">›</button>
+  </div>
+  <div class="totals">
+    <div><div class="num" id="totalToday">₹0</div><div class="label">Spent today</div></div>
+    <div><div class="num" id="totalMonth">₹0</div><div class="label" id="totalMonthLabel">This month</div></div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite">Expense Added</div>
+
+  <form class="entry-form" id="entryForm">
+    <div class="row">
+      <div class="field">
+        <label>Amount</label>
+        <input type="number" id="amount" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <button type="button" class="dd-btn" id="catBtn"><span id="catBtnLabel"></span><span>▾</span></button>
+        <div class="dd-panel" id="catPanel">
+          <div id="catItems"></div>
+          <div class="dd-add-row">
+            <input type="text" id="newCatInput" placeholder="Add category">
+            <button type="button" id="addCatBtn">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Date</label>
+        <button type="button" class="date-btn" id="dateBtn"><span id="dateBtnLabel"></span><span>📅</span></button>
+        <div class="cal-panel" id="calPanel">
+          <div class="cal-head">
+            <button type="button" id="calPrev">‹</button>
+            <span id="calMonthLabel"></span>
+            <button type="button" id="calNext">›</button>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+      </div>
+      <div class="field grow2">
+        <label>Note (optional)</label>
+        <input type="text" id="note" placeholder="What was it for?">
+      </div>
+    </div>
+    <button type="submit" class="add">Add expense</button>
+  </form>
+
+  <button type="button" class="records-toggle" id="recordsToggle">
+    <h2>Monthly expenses</h2>
+    <span class="chev">▾</span>
+  </button>
+  <div class="records-body" id="recordsBody">
+    <div id="list"></div>
+  </div>
+  </div>
+  </div>
+
+  <div id="vizView" hidden>
+    <div class="viz-stats">
+      <div class="viz-card"><span class="viz-icon">📅</span><div><div class="viz-label">Average per month</div><div class="viz-num" id="vizAvg">₹0</div></div></div>
+      <div class="viz-card highlight"><span class="viz-icon">⭐</span><div><div class="viz-label">Highest month</div><div class="viz-num" id="vizHighest">₹0</div><div class="viz-sub" id="vizHighestMonth"></div></div></div>
+      <div class="viz-card"><span class="viz-icon">Σ</span><div><div class="viz-label">Total (12 months)</div><div class="viz-num" id="vizTotal">₹0</div></div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-head"><h2>Expenses per month</h2></div>
+      <div id="chartWrap"></div>
+    </div>
+  </div>
+</div>
+
+<div class="auth-overlay" id="authOverlay" hidden>
+  <section class="auth-card" role="dialog" aria-modal="true" aria-label="Log in or sign up">
+    <button type="button" class="auth-close" id="authClose" aria-label="Close">×</button>
+    <div class="auth-icon">💰</div>
+    <h2 class="auth-title" id="authTitle">Welcome back</h2>
+    <p class="auth-sub" id="authSub">Log in to keep your expenses synced everywhere.</p>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" id="tabLogin">Log in</button>
+      <button type="button" class="auth-tab" id="tabSignup">Sign up</button>
+    </div>
+    <form id="authForm" novalidate>
+      <div class="field" id="nameField" hidden>
+        <label for="authName">Name</label>
+        <input type="text" id="authName" autocomplete="name" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" autocomplete="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label for="authPass">Password</label>
+        <input type="password" id="authPass" autocomplete="current-password" placeholder="At least 6 characters" required>
+      </div>
+      <div class="field" id="confirmField" hidden>
+        <label for="authPass2">Confirm password</label>
+        <input type="password" id="authPass2" autocomplete="new-password" placeholder="Repeat password">
+      </div>
+      <p class="auth-error" id="authError" role="alert"></p>
+      <button type="submit" class="add" id="authSubmit">Log in</button>
+    </form>
+  </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="script.js"></script>
+</body>
+</html>
