@@ -13,7 +13,7 @@ const listEl=document.getElementById('list');
 const catBtn=document.getElementById('catBtn'), catBtnLabel=document.getElementById('catBtnLabel'), catPanel=document.getElementById('catPanel'), catItems=document.getElementById('catItems');
 const newCatInput=document.getElementById('newCatInput'), addCatBtn=document.getElementById('addCatBtn');
 const dateBtn=document.getElementById('dateBtn'), dateBtnLabel=document.getElementById('dateBtnLabel'), calPanel=document.getElementById('calPanel'), calGrid=document.getElementById('calGrid'), calMonthLabel=document.getElementById('calMonthLabel');
-const recordsToggle=document.getElementById('recordsToggle'), recordsBody=document.getElementById('recordsBody');
+const vizRecordsToggle=document.getElementById('vizRecordsToggle'), vizRecordsBody=document.getElementById('vizRecordsBody'), vizDayList=document.getElementById('vizDayList'), vizRecordsTitle=document.getElementById('vizRecordsTitle');
 const tabBtns=document.querySelectorAll('.tab-btn'), homeView=document.getElementById('homeView'), vizView=document.getElementById('vizView');
 const chartWrap=document.getElementById('chartWrap'), vizAvg=document.getElementById('vizAvg'), vizHighest=document.getElementById('vizHighest'), vizHighestMonth=document.getElementById('vizHighestMonth'), vizTotal=document.getElementById('vizTotal');
 
@@ -33,6 +33,8 @@ let selectedCategory=DEFAULT_CATS[0];
 let selectedDate=todayIso();
 let calViewMonth=selectedDate.slice(0,7);
 let editingId=null;
+let selectedVizMonth=todayIso().slice(0,7);
+let expandedVizDays=new Set();
 
 function allCats(){return DEFAULT_CATS.concat(customCats);}
 
@@ -145,11 +147,15 @@ loadTrustCount();
 /* ---- visualization ---- */
 function last12Months(){
   const out=[]; let ym=todayIso().slice(0,7);
-  for(let i=0;i<12;i++){out.unshift(ym); ym=shiftMonth(ym,-1);}
+  for(let i=0;i<12;i++){out.push(ym); ym=shiftMonth(ym,-1);}
   return out;
+}
+function vizMonthText(ym){
+  return monthLabelFor(ym);
 }
 function renderViz(){
   const months=last12Months();
+  if(!months.includes(selectedVizMonth)) selectedVizMonth=months[0];
   const totals=months.map(ym=>expenses.filter(e=>e.date.startsWith(ym)).reduce((s,e)=>s+e.amount,0));
   const grand=totals.reduce((a,b)=>a+b,0);
   const avg=grand/12;
@@ -165,37 +171,55 @@ function renderViz(){
     const x=i*(w/months.length)+((w/months.length)-barW)/2;
     const barH=Math.round((totals[i]/max)*(h-padB-padT));
     const y=h-padB-barH;
-    const cls=i===bestIdx&&totals[i]>0?'bar-col best':'bar-col';
+    const isSelected=ym===selectedVizMonth;
+    const cls=`bar-col${i===bestIdx&&totals[i]>0?' best':''}${isSelected?' selected':''}`;
     const label=new Date(ym+'-01T00:00:00').toLocaleDateString('en-IN',{month:'short',year:'2-digit'});
     const valTxt=totals[i]>0?(totals[i]>=1000?Math.round(totals[i]/1000)+'k':Math.round(totals[i])):'';
-    return `<rect class="${cls}" x="${x}" y="${y}" width="${barW}" height="${Math.max(barH,totals[i]>0?3:0)}" rx="5"></rect>
+    return `<g class="month-bar" data-month="${ym}" role="button" tabindex="0" aria-label="${esc(monthLabelFor(ym))}">
+      <rect class="${cls}" x="${x}" y="${y}" width="${barW}" height="${Math.max(barH,totals[i]>0?3:0)}" rx="5"></rect>
       <text class="bar-val" x="${x+barW/2}" y="${y-5}" text-anchor="middle">${valTxt}</text>
-      <text class="bar-label" x="${x+barW/2}" y="${h-12}" text-anchor="middle">${label}</text>`;
+      <text class="bar-label" x="${x+barW/2}" y="${h-12}" text-anchor="middle">${label}</text>
+    </g>`;
   }).join('');
   chartWrap.innerHTML=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="min-width:${w}px;display:block"><line x1="0" y1="${h-padB}" x2="${w}" y2="${h-padB}" stroke="var(--line)"></line>${bars}</svg>`;
+
+  chartWrap.querySelectorAll('.month-bar').forEach(bar=>{
+    const choose=()=>selectVizMonth(bar.dataset.month);
+    bar.addEventListener('click',choose);
+    bar.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}});
+  });
+  renderVizRecords();
 }
 
-/* ---- records toggle ---- */
-recordsToggle.addEventListener('click',()=>{
-  const open=recordsBody.classList.toggle('open');
-  recordsToggle.classList.toggle('open',open);
+function selectVizMonth(ym){
+  selectedVizMonth=ym;
+  expandedVizDays.clear();
+  renderViz();
+  vizRecordsBody.classList.add('open');
+  vizRecordsToggle.classList.add('open');
+  vizRecordsBody.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ---- visualization records toggle ---- */
+vizRecordsToggle.addEventListener('click',()=>{
+  const open=vizRecordsBody.classList.toggle('open');
+  vizRecordsToggle.classList.toggle('open',open);
 });
 
-/* ---- render list ---- */
-function render(){
-  refreshMonthNav();
-  const monthExpenses=expenses.filter(e=>e.date.startsWith(activeMonth));
+function renderVizRecords(){
+  const monthExpenses=expenses.filter(e=>e.date.startsWith(selectedVizMonth));
+  vizRecordsTitle.textContent=monthLabelFor(selectedVizMonth)+' expenses';
   if(monthExpenses.length===0){
-    listEl.innerHTML=`<div class="empty-state"><span>Nothing logged for ${monthLabelFor(activeMonth)}</span>Add an expense above to start this month's ledger.</div>`;
+    vizDayList.innerHTML=`<div class="empty-state"><span>Nothing logged for ${monthLabelFor(selectedVizMonth)}</span>Add an expense above to start this month's ledger.</div>`;
     return;
   }
-  const sorted=[...monthExpenses].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
   const groups={};
-  sorted.forEach(e=>{(groups[e.date]=groups[e.date]||[]).push(e);});
-  listEl.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>{
+  [...monthExpenses].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).forEach(e=>{(groups[e.date]=groups[e.date]||[]).push(e);});
+  vizDayList.innerHTML=Object.keys(groups).sort((a,b)=>b.localeCompare(a)).map(date=>{
     const items=groups[date];
     const dayTotal=items.reduce((s,e)=>s+e.amount,0);
-    const rows=items.map(e=>e.id===editingId?editRowHtml(e):`
+    const expanded=expandedVizDays.has(date);
+    const rows=expanded?items.map(e=>e.id===editingId?editRowHtml(e):`
       <div class="entry" data-id="${e.id}">
         <span class="cat">${esc(e.category)}</span>
         <span class="note">${e.note?esc(e.note):'<span class="empty">No note</span>'}</span>
@@ -204,21 +228,63 @@ function render(){
           <button class="edit" aria-label="Edit entry" title="Edit">✎</button>
           <button class="del" aria-label="Delete entry" title="Delete">×</button>
         </span>
-      </div>`).join('');
-    return `<div class="day-group"><div class="day-heading"><span>${dayLabel(date)}</span><span>${fmt(dayTotal)}</span></div>${rows}</div>`;
+      </div>`).join(''):' ';
+    return `<div class="day-group viz-day-group" data-date="${date}">
+      <button type="button" class="viz-day-summary${expanded?' active':''}" data-date="${date}">
+        <span class="viz-day-name">${dayLabelWithWeekday(date)}</span>
+        <span class="viz-day-total">${fmt(dayTotal)}</span>
+        <span class="viz-day-chevron">›</span>
+      </button>
+      ${expanded?`<div class="viz-day-details">${rows}</div>`:''}
+    </div>`;
   }).join('');
 }
-function editRowHtml(e){
-  const opts=allCats().map(c=>`<option ${c===e.category?'selected':''}>${esc(c)}</option>`).join('');
-  return `<div class="edit-row" data-id="${e.id}">
-    <div class="row">
-      <div class="field"><label>Amount</label><input type="number" step="0.01" min="0" class="ed-amount" value="${e.amount}"></div>
-      <div class="field"><label>Date</label><input type="date" class="ed-date" value="${e.date}"></div>
-    </div>
-    <div class="row"><div class="field"><label>Category</label><select class="ed-category">${opts}</select></div></div>
-    <div class="row"><div class="field grow2"><label>Note</label><input type="text" class="ed-note" value="${e.note?esc(e.note):''}"></div></div>
-    <div class="edit-actions"><button type="button" class="save">Save</button><button type="button" class="cancel">Cancel</button></div>
-  </div>`;
+
+function dayLabelWithWeekday(iso){
+  const d=new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',weekday:'long'});
+}
+
+function handleRecordClick(ev){
+  const summary=ev.target.closest('.viz-day-summary');
+  if(summary){
+    const date=summary.dataset.date;
+    if(expandedVizDays.has(date)) expandedVizDays.delete(date); else expandedVizDays.add(date);
+    editingId=null;
+    renderVizRecords();
+    return;
+  }
+  const delBtn=ev.target.closest('.del'), editBtn=ev.target.closest('.edit'), saveBtn=ev.target.closest('.save'), cancelBtn=ev.target.closest('.cancel');
+  if(delBtn){
+    const id=Number(delBtn.closest('.entry').dataset.id);
+    if(user){sb.from('expenses').delete().eq('id',id).then(({error})=>{if(error){showToast('Could not delete. Please try again.');return;} expenses=expenses.filter(e=>e.id!==id);render();renderViz();});}
+    else {expenses=expenses.filter(e=>e.id!==id);render();renderViz();}
+    return;
+  }
+  if(editBtn){editingId=Number(editBtn.closest('.entry').dataset.id);renderVizRecords();return;}
+  if(cancelBtn){editingId=null;renderVizRecords();return;}
+  if(saveBtn){
+    const row=saveBtn.closest('.edit-row'); const id=Number(row.dataset.id);
+    const amount=parseFloat(row.querySelector('.ed-amount').value);
+    const date=row.querySelector('.ed-date').value;
+    const category=row.querySelector('.ed-category').value;
+    const note=row.querySelector('.ed-note').value.trim();
+    if(!amount||amount<=0||!date)return;
+    const finish=()=>{
+      const idx=expenses.findIndex(e=>e.id===id);
+      if(idx>-1)expenses[idx]={id,amount,date,category,note};
+      editingId=null; selectedVizMonth=date.slice(0,7); expandedVizDays.clear(); expandedVizDays.add(date); render(); renderViz();
+      vizRecordsBody.classList.add('open'); vizRecordsToggle.classList.add('open');
+    };
+    if(user){sb.from('expenses').update({amount,date,category,note}).eq('id',id).then(({error})=>{if(error){showToast('Could not save changes.');return;}finish();});}
+    else finish();
+  }
+}
+vizDayList.addEventListener('click',handleRecordClick);
+
+/* ---- render home totals ---- */
+function render(){
+  refreshMonthNav();
 }
 
 form_submit();
@@ -235,31 +301,12 @@ function form_submit(){
     } else expenses.push({id:Date.now(),...rec});
     activeMonth=selectedDate.slice(0,7);
     render();
+    renderViz();
     showToast('Expense Added');
     document.getElementById('amount').value='';document.getElementById('note').value='';document.getElementById('amount').focus();
   });
 }
 
-listEl.addEventListener('click',async(ev)=>{
-  const delBtn=ev.target.closest('.del'), editBtn=ev.target.closest('.edit'), saveBtn=ev.target.closest('.save'), cancelBtn=ev.target.closest('.cancel');
-  if(delBtn){const id=Number(delBtn.closest('.entry').dataset.id);
-    if(user){const {error}=await sb.from('expenses').delete().eq('id',id);if(error){showToast('Could not delete. Please try again.');return;}}
-    expenses=expenses.filter(e=>e.id!==id);render();return;}
-  if(editBtn){editingId=Number(editBtn.closest('.entry').dataset.id);render();return;}
-  if(cancelBtn){editingId=null;render();return;}
-  if(saveBtn){
-    const row=saveBtn.closest('.edit-row'); const id=Number(row.dataset.id);
-    const amount=parseFloat(row.querySelector('.ed-amount').value);
-    const date=row.querySelector('.ed-date').value;
-    const category=row.querySelector('.ed-category').value;
-    const note=row.querySelector('.ed-note').value.trim();
-    if(!amount||amount<=0||!date)return;
-    if(user){const {error}=await sb.from('expenses').update({amount,date,category,note}).eq('id',id);if(error){showToast('Could not save changes.');return;}}
-    const idx=expenses.findIndex(e=>e.id===id);
-    if(idx>-1)expenses[idx]={id,amount,date,category,note};
-    editingId=null; activeMonth=date.slice(0,7); render();
-  }
-});
 
 /* ---- auth: guests can use the app but nothing is saved; logged-in users are saved per account ---- */
 const overlay=document.getElementById('authOverlay'), guestBtns=document.getElementById('guestBtns'), userBar=document.getElementById('userBar'), guestNotice=document.getElementById('guestNotice');
